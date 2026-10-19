@@ -1,10 +1,11 @@
 // src/charts.js — chart APIs for the 4 solar metrics: power, energy, carbon-reduction, revenue.
-//   GET /api/dashboard/:solar_code/charts/:metric
+//   GET /api/dashboard/:solar_code/charts/:metric        metric = power | energy | carbon-reduction | revenue | load
 //   period=day&date=2026-10-17        24 hourly points            (hourly_solar_data)
 //   period=7d&date=2026-10-17         7 daily points ending on date (default today)  (daily_solar_data)
 //   period=month&month=2026-09        one point per calendar day  (daily_solar_data)
 //   period=year&year=2025             12 monthly points           (monthly_solar_data)
 //   window=6h[&end=ISO time]          every calculated reading in (end - 6h, end]   (calculated_solar_device_data)
+//   metric load = battery load_w (W) of every calculated reading; only window=6h (day / 7d / month / year: use /load-events)
 // No formula lives here: values are read from the tables the engine already fills (see solarEngine.js, calc.js).
 // The period / date parsing is shared with the load-events API (loadEvents.resolveRange).
 
@@ -23,6 +24,8 @@ const METRICS = {
   'carbon-reduction': { unit: 'kg',  decimals: 3, hourly: 'co2_kg',           daily: 'co2_kg',          raw: 'today_co2_kg',     additive: true,  rawType: 'day_running_total' },
   revenue:            { unit: 'BDT', decimals: 2, hourly: 'revenue',          daily: 'revenue',         raw: 'today_revenue',    additive: true,  rawType: 'day_running_total' },
 };
+// Battery load: load_w of calculated_solar_device_data, exactly as stored (NULL stays null, it is never turned into 0).
+METRICS.load = { unit: 'W', decimals: 2, raw: 'load_w', additive: false, rawType: 'instantaneous', windowOnly: true };
 METRICS.carbon = METRICS['carbon-reduction'];
 
 const bad = (m) => { throw new BadRequest(m); };
@@ -108,7 +111,8 @@ async function solarSeries(code, metric, win) {
 
 // ---- entry point used by the router ---------------------------------------------------------------
 async function buildChart(code, metric, q, now = new Date()) {
-  if (!METRICS[metric]) bad('metric must be one of: power, energy, carbon-reduction, revenue');
+  if (!METRICS[metric]) bad('metric must be one of: power, energy, carbon-reduction, revenue, load');
+  if (METRICS[metric].windowOnly && q.window === undefined) bad(`${metric} is available as window=6h only; for a day, 7 days, month or year use /load-events`);
   const head = { solar_code: code, metric: metric === 'carbon' ? 'carbon-reduction' : metric, timezone: TIMEZONE, unit: METRICS[metric].unit };
 
   if (q.window !== undefined) {

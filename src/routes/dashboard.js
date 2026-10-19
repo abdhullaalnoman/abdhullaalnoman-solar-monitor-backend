@@ -10,7 +10,7 @@
 // Year chart:          GET /api/dashboard/:solar_code/monthly?year=YYYY            <- monthly_solar_data
 // Old chart:           GET /api/dashboard/:solar_code/power-24h
 // Raw readings:        GET /api/dashboard/:solar_code/raw?start_date=&end_date=
-// Charts (4 metrics):  GET /api/dashboard/:solar_code/charts/:metric   metric = power | energy | carbon-reduction | revenue
+// Charts (4 metrics):  GET /api/dashboard/:solar_code/charts/:metric   metric = power | energy | carbon-reduction | revenue | load (load: window=6h only)
 //                        ?period=day|7d|month|year [&date= | &month= | &year=]   or   ?window=6h [&end=]   (see src/charts.js)
 // Load events:        GET /api/dashboard/:solar_code/load-events?period=day|7d|month|year   <- load_events (see src/loadEvents.js)
 
@@ -314,7 +314,7 @@ router.get('/:solar_code/charts/:metric', async (req, res) => {
   const { solar_code, metric } = req.params;
   try {
     if (!charts.METRICS[metric]) {
-      return res.status(400).json({ success: false, error: 'metric must be one of: power, energy, carbon-reduction, revenue' });
+      return res.status(400).json({ success: false, error: 'metric must be one of: power, energy, carbon-reduction, revenue, load' });
     }
     const site = await query('SELECT 1 FROM solar_list WHERE solar_code = $1', [solar_code]);
     if (site.rowCount === 0) return notFound(res, solar_code);
